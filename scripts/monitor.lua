@@ -41,13 +41,9 @@ function Monitor.layout_hash(train)
   return table.concat(parts, "-")
 end
 
---- Check if a train is at a depot station (name matches any depot pattern in setting).
---- Setting is comma-separated list of patterns, e.g. "depot,D".
-function Monitor.is_at_depot(train)
-  if train.state ~= defines.train_state.wait_station then return false end
-  local station = train.station
-  if not station or not station.valid then return false end
-  local name = station.backer_name
+--- Check if a station name matches any depot pattern in the setting.
+local function is_depot_name(name)
+  if not name then return false end
   local setting = settings.global["ata-depot-pattern"]
   if not setting then return false end
   local patterns_str = setting.value
@@ -60,16 +56,33 @@ function Monitor.is_at_depot(train)
   return false
 end
 
---- Check if a train is "in use" (not idle at a depot).
---- Only depot trains, manual trains, and no-schedule trains count as idle.
+--- Check if a train is at or heading to a depot station.
+function Monitor.is_depot_bound(train)
+  -- At a depot station
+  if train.state == defines.train_state.wait_station then
+    local station = train.station
+    if station and station.valid and is_depot_name(station.backer_name) then
+      return true
+    end
+  end
+
+  -- Heading to a depot station
+  local dest = train.path_end_stop
+  if dest and dest.valid and is_depot_name(dest.backer_name) then
+    return true
+  end
+
+  return false
+end
+
+--- Check if a train is "in use" (not idle/heading to a depot).
+--- Depot-bound trains, manual trains, and no-schedule trains count as idle.
 function Monitor.is_running(train)
   if not train or not train.valid then return false end
   if train.manual_mode then return false end
   local state = train.state
   if state == defines.train_state.no_schedule then return false end
-  if state == defines.train_state.wait_station then
-    return not Monitor.is_at_depot(train)
-  end
+  return not Monitor.is_depot_bound(train)
   return true
 end
 
