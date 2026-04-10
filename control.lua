@@ -12,7 +12,6 @@ local function init_storage()
   storage.templates = storage.templates or {}
   storage.monitor_cache = storage.monitor_cache or nil
   storage.next_template_id = storage.next_template_id or 1
-  storage.deployed_trains = nil  -- removed: no longer tracking deployed trains
   Log.clear()
   Log.log("Storage initialized. deployers=" .. table_size(storage.deployers) .. " templates=" .. table_size(storage.templates))
 end

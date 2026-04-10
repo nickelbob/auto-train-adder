@@ -4,7 +4,7 @@
   "title": "Auto Train Adder",
   "author": "nickpeterson",
   "contact": "",
-  "homepage": "",
+  "homepage": "https://github.com/nickelbob/auto-train-adder",
   "factorio_version": "2.0",
   "dependencies": [
     "base >= 2.0.0"

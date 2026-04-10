@@ -24,4 +24,11 @@ data:extend({
     default_value = "depot,D",
     order = "c",
   },
+  {
+    type = "bool-setting",
+    name = "ata-debug-logging",
+    setting_type = "runtime-global",
+    default_value = false,
+    order = "d",
+  },
 })

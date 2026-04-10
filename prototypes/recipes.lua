@@ -2,7 +2,7 @@ data:extend({
   {
     type = "recipe",
     name = "ata-deployer",
-    enabled = true,
+    enabled = false,
     ingredients = {
       {type = "item", name = "train-stop", amount = 1},
       {type = "item", name = "electronic-circuit", amount = 10},
@@ -14,7 +14,7 @@ data:extend({
   {
     type = "recipe",
     name = "ata-monitor",
-    enabled = true,
+    enabled = false,
     ingredients = {
       {type = "item", name = "constant-combinator", amount = 1},
       {type = "item", name = "electronic-circuit", amount = 5},
