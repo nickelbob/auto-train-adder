@@ -104,13 +104,21 @@ function Deployer.read_circuit_demand(data)
     end
   end
 
-  -- Pick one at random and queue a single deploy job
+  -- Shuffle candidates and queue all of them. The build state machine will
+  -- try each in order, skipping any that fail due to missing items, so a
+  -- missing-items template doesn't block other deployable templates.
   if #candidates > 0 then
-    local chosen = candidates[math.random(1, #candidates)]
-    data.deploy_queue = {{template_id = chosen}}
-    Log.log("DEMAND: queued template_id=" .. chosen .. " from " .. #candidates .. " candidates")
+    for i = #candidates, 2, -1 do
+      local j = math.random(1, i)
+      candidates[i], candidates[j] = candidates[j], candidates[i]
+    end
+    data.deploy_queue = {}
+    for _, tid in ipairs(candidates) do
+      data.deploy_queue[#data.deploy_queue + 1] = {template_id = tid}
+    end
+    Log.log("DEMAND: queued " .. #candidates .. " templates")
   else
-    Log.log("DEMAND: no positive ata-template-N signals found (looking for virtual/ata-template-1 through virtual/ata-template-8)")
+    Log.log("DEMAND: no positive ata-template-N signals found")
   end
 end
 
@@ -173,10 +181,10 @@ function Deployer.tick_validate(data)
 
   Log.log("VALIDATE: template='" .. template.name .. "' layout=" .. Templates.layout_string(template) .. " carriages=" .. #template.layout)
 
-  -- Check chest has all items
+  -- Check chest has all items — if missing, skip to next queued template
   local has_items, missing = Templates.check_inventory(data.chest, template)
   if not has_items then
-    Log.log("VALIDATE: missing items")
+    Log.log("VALIDATE: missing items for '" .. template.name .. "', skipping")
     local missing_parts = {}
     if missing then
       for item_name, count in pairs(missing) do
@@ -185,22 +193,22 @@ function Deployer.tick_validate(data)
     end
     local missing_str = #missing_parts > 0 and table.concat(missing_parts, ", ") or "unknown items"
     send_alert(data, "[ATA] Missing items for '" .. template.name .. "': " .. missing_str)
-    bs.state = Constants.BUILD_STATE.ERROR
-    bs.error_cooldown = Constants.ERROR_COOLDOWN_TICKS
-    bs.error_message = "Missing items: " .. missing_str
+    table.remove(data.deploy_queue, 1)
+    bs.state = Constants.BUILD_STATE.IDLE
+    bs.template_id = nil
     return
   end
 
-  -- Check chest has fuel if template requires it
+  -- Check chest has fuel — if missing, skip to next queued template
   if template.fuel_name and template.fuel_count > 0 then
     local inventory = data.chest.get_inventory(defines.inventory.chest)
     local fuel_available = inventory and inventory.get_item_count(template.fuel_name) or 0
     if fuel_available < template.fuel_count then
-      local msg = "Missing fuel: need " .. template.fuel_count .. "x " .. template.fuel_name .. " (have " .. fuel_available .. ")"
-      send_alert(data, "[ATA] " .. msg)
-      bs.state = Constants.BUILD_STATE.ERROR
-      bs.error_cooldown = Constants.ERROR_COOLDOWN_TICKS
-      bs.error_message = msg
+      Log.log("VALIDATE: missing fuel for '" .. template.name .. "', skipping")
+      send_alert(data, "[ATA] Missing fuel for '" .. template.name .. "': need " .. template.fuel_count .. "x " .. template.fuel_name)
+      table.remove(data.deploy_queue, 1)
+      bs.state = Constants.BUILD_STATE.IDLE
+      bs.template_id = nil
       return
     end
   end
@@ -413,13 +421,13 @@ function Deployer.tick_finalize(data)
   -- Console message
   game.print("[Auto Train Adder] Deployed '" .. template.name .. "' (" .. Templates.layout_string(template) .. ")")
 
-  -- Clean up build state
+  -- Clean up build state — clear entire queue (only deploy one train per demand cycle)
   bs.state = Constants.BUILD_STATE.IDLE
   bs.template_id = nil
   bs.carriage_index = 0
   bs.entity_refs = {}
   bs.items_consumed = {}
-  table.remove(data.deploy_queue, 1)
+  data.deploy_queue = {}
 end
 
 function Deployer.tick_error(data)
