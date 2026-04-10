@@ -211,13 +211,15 @@ function Gui.open_monitor(player, monitor_data)
     for idx, hash in ipairs(cache.ordered_types) do
       if idx > Constants.MAX_MONITOR_TYPES then break end
       local td = cache.type_data[hash]
-      local util = td.total > 0 and math.floor((td.running / td.total) * 100 + 0.5) or 0
+      local total = td and td.total or 0
+      local running = td and td.running or 0
+      local util = total > 0 and math.floor((running / total) * 100 + 0.5) or 0
 
       t.add{type = "label", caption = tostring(idx)}
       t.add{type = "label", caption = "[virtual-signal=" .. Constants.COUNT_SIGNALS[idx] .. "] / [virtual-signal=" .. Constants.UTIL_SIGNALS[idx] .. "]"}
       t.add{type = "label", caption = hash}
-      t.add{type = "label", caption = tostring(td.total)}
-      t.add{type = "label", caption = tostring(td.running)}
+      t.add{type = "label", caption = tostring(total)}
+      t.add{type = "label", caption = tostring(running)}
       t.add{type = "label", caption = tostring(util) .. "%"}
     end
 

@@ -11,6 +11,7 @@ local function init_storage()
   storage.monitors = storage.monitors or {}
   storage.templates = storage.templates or {}
   storage.monitor_cache = storage.monitor_cache or nil
+  storage.monitor_type_order = storage.monitor_type_order or {}
   storage.next_template_id = storage.next_template_id or 1
   Log.clear()
   Log.log("Storage initialized. deployers=" .. table_size(storage.deployers) .. " templates=" .. table_size(storage.templates))

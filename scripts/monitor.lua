@@ -114,11 +114,23 @@ function Monitor.refresh_cache()
     end
   end
 
-  -- Build sorted list for deterministic signal assignment
+  -- Preserve stable signal assignment: existing types keep their index,
+  -- new types are appended to the end.
+  local known = storage.monitor_type_order or {}
+
+  -- Add any new types to the end
   for hash, _ in pairs(cache.type_data) do
-    cache.ordered_types[#cache.ordered_types + 1] = hash
+    local found = false
+    for _, k in ipairs(known) do
+      if k == hash then found = true; break end
+    end
+    if not found then
+      known[#known + 1] = hash
+    end
   end
-  table.sort(cache.ordered_types)
+
+  storage.monitor_type_order = known
+  cache.ordered_types = known
 
   storage.monitor_cache = cache
   return cache
@@ -162,9 +174,9 @@ function Monitor.update_output(data, cache)
     if idx > Constants.MAX_MONITOR_TYPES then break end
 
     local td = cache.type_data[layout_hash]
-    local count = td.total
+    local count = td and td.total or 0
     local utilization = 0
-    if count > 0 then
+    if td and count > 0 then
       utilization = math.floor((td.running / count) * 100 + 0.5)
     end
 
