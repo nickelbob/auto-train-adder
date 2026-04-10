@@ -122,41 +122,6 @@ function Deployer.read_circuit_demand(data)
   end
 end
 
---- Process one tick of the deployer's build state machine.
-function Deployer.tick(data)
-  if not data.entity.valid then return end
-
-  local bs = data.build_state
-
-  check_clear_alert(data)
-
-  if bs.state == Constants.BUILD_STATE.IDLE then
-    Deployer.tick_idle(data)
-  elseif bs.state == Constants.BUILD_STATE.VALIDATE then
-    Deployer.tick_validate(data)
-  elseif bs.state == Constants.BUILD_STATE.PLACE_CARRIAGE then
-    Deployer.tick_place_carriage(data)
-  elseif bs.state == Constants.BUILD_STATE.FINALIZE then
-    Deployer.tick_finalize(data)
-  elseif bs.state == Constants.BUILD_STATE.ERROR then
-    Deployer.tick_error(data)
-  end
-
-  Deployer.update_output_signals(data)
-end
-
-function Deployer.tick_idle(data)
-  if #data.deploy_queue > 0 then
-    local job = data.deploy_queue[1]
-    Log.log("IDLE -> VALIDATE: starting build for template_id=" .. job.template_id)
-    data.build_state.state = Constants.BUILD_STATE.VALIDATE
-    data.build_state.template_id = job.template_id
-    data.build_state.carriage_index = 0
-    data.build_state.entity_refs = {}
-    data.build_state.items_consumed = {}
-  end
-end
-
 --- Send a Factorio alert to all players on the deployer's force.
 --- Also track what template triggered it so we can auto-dismiss.
 local function send_alert(data, message, template_id)
@@ -200,6 +165,41 @@ local function check_clear_alert(data)
     end
   end
   data._alert_template_id = nil
+end
+
+--- Process one tick of the deployer's build state machine.
+function Deployer.tick(data)
+  if not data.entity.valid then return end
+
+  local bs = data.build_state
+
+  check_clear_alert(data)
+
+  if bs.state == Constants.BUILD_STATE.IDLE then
+    Deployer.tick_idle(data)
+  elseif bs.state == Constants.BUILD_STATE.VALIDATE then
+    Deployer.tick_validate(data)
+  elseif bs.state == Constants.BUILD_STATE.PLACE_CARRIAGE then
+    Deployer.tick_place_carriage(data)
+  elseif bs.state == Constants.BUILD_STATE.FINALIZE then
+    Deployer.tick_finalize(data)
+  elseif bs.state == Constants.BUILD_STATE.ERROR then
+    Deployer.tick_error(data)
+  end
+
+  Deployer.update_output_signals(data)
+end
+
+function Deployer.tick_idle(data)
+  if #data.deploy_queue > 0 then
+    local job = data.deploy_queue[1]
+    Log.log("IDLE -> VALIDATE: starting build for template_id=" .. job.template_id)
+    data.build_state.state = Constants.BUILD_STATE.VALIDATE
+    data.build_state.template_id = job.template_id
+    data.build_state.carriage_index = 0
+    data.build_state.entity_refs = {}
+    data.build_state.items_consumed = {}
+  end
 end
 
 function Deployer.tick_validate(data)
