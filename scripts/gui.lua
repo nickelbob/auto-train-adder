@@ -39,30 +39,20 @@ function Gui.open_deployer(player, deployer_data)
 
   frame.add{type = "line"}
 
-  -- Circuit signals section
-  frame.add{type = "label", caption = "Incoming Circuit Signals", style = "heading_2_label"}
-  local signals_on_wire = deployer_data._last_signals or {}
-  local has_any_signal = false
-  for _ in pairs(signals_on_wire) do has_any_signal = true; break end
-
-  if has_any_signal then
-    local sig_table = frame.add{type = "table", column_count = 2}
-    sig_table.add{type = "label", caption = "Signal", style = "bold_label"}
-    sig_table.add{type = "label", caption = "Value", style = "bold_label"}
-    for key, count in pairs(signals_on_wire) do
-      sig_table.add{type = "label", caption = key}
-      sig_table.add{type = "label", caption = tostring(count)}
-    end
-  else
-    frame.add{type = "label", caption = "No signals detected on red/green wire."}
-  end
-
-  -- Check which template signals are currently positive
+  -- Read template signal values directly from the circuit network
   local active_template_signals = {}
-  for i = 1, Constants.MAX_TEMPLATES do
-    local key = "virtual/ata-template-" .. i
-    if signals_on_wire[key] and signals_on_wire[key] > 0 then
-      active_template_signals[i] = signals_on_wire[key]
+  local entity = deployer_data.entity
+  if entity and entity.valid then
+    local red_net = entity.get_circuit_network(defines.wire_connector_id.circuit_red)
+    local green_net = entity.get_circuit_network(defines.wire_connector_id.circuit_green)
+    for i = 1, Constants.MAX_TEMPLATES do
+      local sig = {type = "virtual", name = Constants.TEMPLATE_SIGNAL_PREFIX .. i}
+      local val = 0
+      if red_net then val = val + (red_net.get_signal(sig) or 0) end
+      if green_net then val = val + (green_net.get_signal(sig) or 0) end
+      if val ~= 0 then
+        active_template_signals[i] = val
+      end
     end
   end
 
@@ -121,11 +111,31 @@ function Gui.open_deployer(player, deployer_data)
     text = "Template " .. storage.next_template_id,
   }
   save_flow.add{type = "label", caption = "Signal #:"}
+  -- Build dropdown items showing which slots are taken
+  local dropdown_items = {}
+  local first_free = 1
+  for i = 1, Constants.MAX_TEMPLATES do
+    local existing = Templates.get_by_signal_index(i)
+    if existing then
+      dropdown_items[i] = tostring(i) .. " (used: " .. existing.name .. ")"
+    else
+      dropdown_items[i] = tostring(i)
+      if first_free == i - 1 + 1 then first_free = i end  -- track first available
+    end
+  end
+  -- Find actual first free slot
+  first_free = 1
+  for i = 1, Constants.MAX_TEMPLATES do
+    if not Templates.get_by_signal_index(i) then
+      first_free = i
+      break
+    end
+  end
   save_flow.add{
     type = "drop-down",
     name = "ata-signal-index",
-    items = {"1", "2", "3", "4", "5", "6", "7", "8"},
-    selected_index = 1,
+    items = dropdown_items,
+    selected_index = first_free,
   }
   save_flow.add{
     type = "button",
@@ -278,6 +288,13 @@ function Gui.on_gui_click(event)
 
     local template_name = name_field and name_field.text or ("Template " .. storage.next_template_id)
     local signal_index = signal_dropdown and signal_dropdown.selected_index or 1
+
+    -- Check if signal slot is already taken
+    local existing = Templates.get_by_signal_index(signal_index)
+    if existing then
+      player.print("[Auto Train Adder] Signal slot " .. signal_index .. " is already used by template '" .. existing.name .. "'. Delete it first or pick another slot.")
+      return
+    end
 
     local template, err = Templates.save_from_train(train, template_name, signal_index)
     if template then

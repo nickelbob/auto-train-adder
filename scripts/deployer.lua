@@ -79,52 +79,6 @@ function Deployer.read_circuit_demand(data)
   local red_network = entity.get_circuit_network(defines.wire_connector_id.circuit_red)
   local green_network = entity.get_circuit_network(defines.wire_connector_id.circuit_green)
 
-  -- Collect all signals on the wire
-  local all_signals = {}
-  if red_network then
-    local sigs = red_network.signals
-    if sigs then
-      for _, sig in ipairs(sigs) do
-        local key = (sig.signal.type or "?") .. "/" .. (sig.signal.name or "?")
-        all_signals[key] = (all_signals[key] or 0) + sig.count
-      end
-    end
-  end
-  if green_network then
-    local sigs = green_network.signals
-    if sigs then
-      for _, sig in ipairs(sigs) do
-        local key = (sig.signal.type or "?") .. "/" .. (sig.signal.name or "?")
-        all_signals[key] = (all_signals[key] or 0) + sig.count
-      end
-    end
-  end
-
-  -- Subtract our own output combinator signals to get only incoming signals
-  local our_output = {}
-  if data.output and data.output.valid then
-    local cb = data.output.get_or_create_control_behavior()
-    if cb and cb.sections_count > 0 then
-      local section = cb.get_section(1)
-      for i = 1, 20 do
-        local slot = section.get_slot(i)
-        if slot and slot.value then
-          local key = (slot.value.type or "?") .. "/" .. (slot.value.name or "?")
-          our_output[key] = (our_output[key] or 0) + (slot.min or 0)
-        end
-      end
-    end
-  end
-
-  local incoming_signals = {}
-  for key, count in pairs(all_signals) do
-    local net = count - (our_output[key] or 0)
-    if net ~= 0 then
-      incoming_signals[key] = net
-    end
-  end
-  data._last_signals = incoming_signals  -- cache for GUI display
-
   -- Collect all templates with a positive signal
   local candidates = {}
   for i = 1, Constants.MAX_TEMPLATES do
