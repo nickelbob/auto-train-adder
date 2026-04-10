@@ -83,7 +83,6 @@ function Monitor.is_running(train)
   local state = train.state
   if state == defines.train_state.no_schedule then return false end
   return not Monitor.is_depot_bound(train)
-  return true
 end
 
 --- Refresh the shared train count cache with totals and running counts.
