@@ -128,6 +128,8 @@ function Deployer.tick(data)
 
   local bs = data.build_state
 
+  check_clear_alert(data)
+
   if bs.state == Constants.BUILD_STATE.IDLE then
     Deployer.tick_idle(data)
   elseif bs.state == Constants.BUILD_STATE.VALIDATE then
@@ -156,7 +158,8 @@ function Deployer.tick_idle(data)
 end
 
 --- Send a Factorio alert to all players on the deployer's force.
-local function send_alert(data, message)
+--- Also track what template triggered it so we can auto-dismiss.
+local function send_alert(data, message, template_id)
   for _, player in pairs(game.players) do
     if player.force == data.entity.force then
       player.add_custom_alert(
@@ -167,6 +170,36 @@ local function send_alert(data, message)
       )
     end
   end
+  data._alert_template_id = template_id
+end
+
+--- Clear alert if the chest now has the items for the alerted template.
+local function check_clear_alert(data)
+  if not data._alert_template_id then return end
+  local template = Templates.get(data._alert_template_id)
+  if not template then
+    data._alert_template_id = nil
+    return
+  end
+  if not data.chest or not data.chest.valid then return end
+
+  local has_items = Templates.check_inventory(data.chest, template)
+  if not has_items then return end
+
+  -- Also check fuel
+  if template.fuel_name and template.fuel_count > 0 then
+    local inventory = data.chest.get_inventory(defines.inventory.chest)
+    local fuel_available = inventory and inventory.get_item_count(template.fuel_name) or 0
+    if fuel_available < template.fuel_count then return end
+  end
+
+  -- Items and fuel are now available — dismiss alert
+  for _, player in pairs(game.players) do
+    if player.force == data.entity.force then
+      player.remove_alert{entity = data.entity}
+    end
+  end
+  data._alert_template_id = nil
 end
 
 function Deployer.tick_validate(data)
@@ -192,7 +225,7 @@ function Deployer.tick_validate(data)
       end
     end
     local missing_str = #missing_parts > 0 and table.concat(missing_parts, ", ") or "unknown items"
-    send_alert(data, "[ATA] Missing items for '" .. template.name .. "': " .. missing_str)
+    send_alert(data, "[ATA] Missing items for '" .. template.name .. "': " .. missing_str, template.template_id)
     table.remove(data.deploy_queue, 1)
     bs.state = Constants.BUILD_STATE.IDLE
     bs.template_id = nil
@@ -205,7 +238,7 @@ function Deployer.tick_validate(data)
     local fuel_available = inventory and inventory.get_item_count(template.fuel_name) or 0
     if fuel_available < template.fuel_count then
       Log.log("VALIDATE: missing fuel for '" .. template.name .. "', skipping")
-      send_alert(data, "[ATA] Missing fuel for '" .. template.name .. "': need " .. template.fuel_count .. "x " .. template.fuel_name)
+      send_alert(data, "[ATA] Missing fuel for '" .. template.name .. "': need " .. template.fuel_count .. "x " .. template.fuel_name, template.template_id)
       table.remove(data.deploy_queue, 1)
       bs.state = Constants.BUILD_STATE.IDLE
       bs.template_id = nil
